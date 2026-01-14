@@ -3,161 +3,109 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "mysql"
   url      = env("DATABASE_URL")
 }
 
-model Programs {
-  id            Int             @id @default(autoincrement())
-  title         String         @db.VarChar(255)
-  description   String         @db.Text
-  createdAt     DateTime       @default(now()) @map("created_at")
-  modules       Modules[]
-  onlineCourses OnlineCourses[]
-  certifications Certifications[]
+// ============================================
+// Enums
+// ============================================
 
-  @@map("programs")
+enum Role {
+  ADMIN
+  STUDENT
 }
 
-model Modules {
-  id          Int       @id @default(autoincrement())
-  programId   Int       @map("program_id")
-  title       String    @db.VarChar(255)
-  description String?   @db.Text
-  orderNum    Int       @default(0) @map("order_num")
-  program     Programs  @relation(fields: [programId], references: [id], onDelete: Cascade)
-
-  @@map("modules")
+enum SubmissionStatus {
+  PENDING
+  PASS
+  FAIL
 }
 
-model OnlineCourses {
-  id        Int      @id @default(autoincrement())
-  programId Int      @map("program_id")
-  title     String   @db.VarChar(255)
-  url       String   @db.VarChar(500)
-  platform  String?  @db.VarChar(100)
-  duration  String?  @db.VarChar(50)
-  program   Programs @relation(fields: [programId], references: [id], onDelete: Cascade)
+// ============================================
+// Models
+// ============================================
 
-  @@map("online_courses")
-}
-
-model Certifications {
-  id           Int      @id @default(autoincrement())
-  programId    Int      @map("program_id")
-  title        String   @db.VarChar(255)
-  description  String?  @db.Text
-  requirements String?  @db.Text
-  program      Programs @relation(fields: [programId], references: [id], onDelete: Cascade)
-
-  @@map("certifications")
-}
-
-model Roadmaps {
-  id          Int            @id @default(autoincrement())
-  careerPath  String         @map("career_path") @db.VarChar(255)
-  description String?        @db.Text
-  createdAt   DateTime       @default(now()) @map("created_at")
-  steps       RoadmapSteps[]
-
-  @@map("roadmaps")
-}
-
-model RoadmapSteps {
-  id          Int      @id @default(autoincrement())
-  roadmapId   Int      @map("roadmap_id")
-  title       String   @db.VarChar(255)
-  description String?  @db.Text
-  orderNum    Int      @default(0) @map("order_num")
-  roadmap     Roadmaps @relation(fields: [roadmapId], references: [id], onDelete: Cascade)
-
-  @@map("roadmap_steps")
-}
-
-model Forums {
-  id          Int      @id @default(autoincrement())
-  category    String   @db.VarChar(255)
-  description String?  @db.Text
-  createdAt   DateTime @default(now()) @map("created_at")
-  posts       Posts[]
-
-  @@map("forums")
-}
-
-model Users {
-  id        Int       @id @default(autoincrement())
-  name      String    @db.VarChar(255)
-  email     String    @unique @db.VarChar(255)
-  createdAt DateTime  @default(now()) @map("created_at")
-  posts     Posts[]
-  comments  Comments[]
+model User {
+  id          Int          @id @default(autoincrement())
+  email       String       @unique
+  password    String
+  name        String?
+  role        Role         @default(STUDENT)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  progress    Progress[]
+  submissions Submission[]
 
   @@map("users")
 }
 
-model Posts {
-  id        Int       @id @default(autoincrement())
-  forumId   Int       @map("forum_id")
-  userId    Int       @map("user_id")
-  title     String    @db.VarChar(255)
-  content   String    @db.Text
-  createdAt DateTime  @default(now()) @map("created_at")
-  forum     Forums    @relation(fields: [forumId], references: [id], onDelete: Cascade)
-  user      Users     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  comments  Comments[]
+model Stack {
+  id          Int          @id @default(autoincrement())
+  slug        String       @unique
+  title       String
+  description String?      @db.Text
+  thumbnail   String?
+  sortOrder   Int          @default(0)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  topics      Topic[]
+  submissions Submission[]
 
-  @@map("posts")
+  @@map("stacks")
 }
 
-model Comments {
+model Topic {
   id        Int      @id @default(autoincrement())
-  postId    Int      @map("post_id")
-  userId    Int      @map("user_id")
-  content   String   @db.Text
-  createdAt DateTime @default(now()) @map("created_at")
-  post      Posts    @relation(fields: [postId], references: [id], onDelete: Cascade)
-  user      Users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  sortOrder Int      @default(0)
+  stackId   Int
+  stack     Stack    @relation(fields: [stackId], references: [id], onDelete: Cascade)
+  videos    Video[]
+  createdAt DateTime @default(now())
 
-  @@map("comments")
+  @@map("topics")
 }
 
-model About {
-  id      Int     @id @default(autoincrement())
-  title   String  @db.VarChar(255)
-  content String  @db.Text
-  vision  String? @db.Text
-  mission String? @db.Text
+model Video {
+  id        Int        @id @default(autoincrement())
+  title     String
+  youtubeId String
+  duration  Int        @default(0) // Duration in seconds
+  sortOrder Int        @default(0)
+  topicId   Int
+  topic     Topic      @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  progress  Progress[]
+  createdAt DateTime   @default(now())
 
-  @@map("about")
+  @@map("videos")
 }
 
-model Contacts {
-  id    Int     @id @default(autoincrement())
-  type  String  @db.VarChar(100)
-  value String  @db.VarChar(255)
-  icon  String? @db.VarChar(100)
+model Progress {
+  id          Int       @id @default(autoincrement())
+  isCompleted Boolean   @default(false)
+  userId      Int
+  videoId     Int
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  video       Video     @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
 
-  @@map("contacts")
+  @@unique([userId, videoId])
+  @@map("progress")
 }
 
-model Documentaries {
-  id          Int     @id @default(autoincrement())
-  title       String  @db.VarChar(255)
-  description String? @db.Text
-  url         String  @db.VarChar(500)
-  duration    String? @db.VarChar(50)
-  category    String? @db.VarChar(100)
+model Submission {
+  id        Int              @id @default(autoincrement())
+  repoLink  String
+  status    SubmissionStatus @default(PENDING)
+  feedback  String?          @db.Text
+  userId    Int
+  stackId   Int
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stack     Stack            @relation(fields: [stackId], references: [id], onDelete: Cascade)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
 
-  @@map("documentaries")
-}
-
-model CommunityLinks {
-  id          Int     @id @default(autoincrement())
-  platform    String  @db.VarChar(100)
-  url         String  @db.VarChar(500)
-  description String? @db.Text
-  icon        String? @db.VarChar(100)
-
-  @@map("community_links")
-
+  @@map("submissions")
 }
